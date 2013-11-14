@@ -4221,6 +4221,11 @@ Sema::ActOnCallExpr(Scope *S, Expr *Fn, SourceLocation LParenLoc,
     }
   }
 
+//  if (getLangOpts().CUDA)
+//    if (FunctionDecl *Caller = dyn_cast<FunctionDecl>(CurContext))
+//        if (FunctionDecl *Callee = dyn_cast<FunctionDecl>(Fn))
+//          InheritCUDATarget(Caller, Callee);
+
   // If we're directly calling a function, get the appropriate declaration.
   if (Fn->getType() == Context.UnknownAnyTy) {
     ExprResult result = rebuildUnknownAnyFunction(*this, Fn);

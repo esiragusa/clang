@@ -3812,10 +3812,14 @@ static void handleDeviceAttr(Sema &S, Decl *D, const AttributeList &Attr) {
         << Attr.getName() << ExpectedVariableOrFunction;
       return;
     }
-
+    llvm::outs() << "ASSIGN  ";
+    D->print(llvm::outs());
+    llvm::outs() << " == ";
     D->addAttr(::new (S.Context)
                CUDADeviceAttr(Attr.getRange(), S.Context,
                               Attr.getAttributeSpellingListIndex()));
+    D->print(llvm::outs());
+    llvm::outs() << "\n";
   } else {
     S.Diag(Attr.getLoc(), diag::warn_attribute_ignored) << "device";
   }
@@ -3848,9 +3852,15 @@ static void handleGlobalAttr(Sema &S, Decl *D, const AttributeList &Attr) {
       return;
     }
 
+    llvm::outs() << "ASSIGN  ";
+    D->print(llvm::outs());
+    llvm::outs() << " == ";
+    // FIXIT should't we check that the function is non-inline?
     D->addAttr(::new (S.Context)
                CUDAGlobalAttr(Attr.getRange(), S.Context,
                               Attr.getAttributeSpellingListIndex()));
+    D->print(llvm::outs());
+    llvm::outs() << "\n";
   } else {
     S.Diag(Attr.getLoc(), diag::warn_attribute_ignored) << "global";
   }
@@ -3863,15 +3873,25 @@ static void handleHostAttr(Sema &S, Decl *D, const AttributeList &Attr) {
       return;
 
 
-    if (!isa<FunctionDecl>(D)) {
+    if (FunctionDecl *FD = dyn_cast<FunctionDecl>(D)) {
+        llvm::outs() << "ASSIGN  ";
+        D->print(llvm::outs());
+        llvm::outs() << " == ";
+        // Add host attribute only to non-template non-inline declarations.
+        if (FD->getTemplatedKind() == FunctionDecl::TK_NonTemplate && !FD->isInlined())
+        {
+            D->addAttr(::new (S.Context)
+                       CUDAHostAttr(Attr.getRange(), S.Context,
+                                    Attr.getAttributeSpellingListIndex()));
+        }
+        D->print(llvm::outs());
+        llvm::outs() << "\n";
+    } else {
       S.Diag(Attr.getLoc(), diag::warn_attribute_wrong_decl_type)
         << Attr.getName() << ExpectedFunction;
       return;
     }
 
-    D->addAttr(::new (S.Context)
-               CUDAHostAttr(Attr.getRange(), S.Context,
-                            Attr.getAttributeSpellingListIndex()));
   } else {
     S.Diag(Attr.getLoc(), diag::warn_attribute_ignored) << "host";
   }
@@ -4690,8 +4710,6 @@ static void handleForceInlineAttr(Sema &S, Decl *D, const AttributeList &Attr) {
 static void ProcessNonInheritableDeclAttr(Sema &S, Scope *scope, Decl *D,
                                           const AttributeList &Attr) {
   switch (Attr.getKind()) {
-  case AttributeList::AT_CUDADevice:  handleDeviceAttr      (S, D, Attr); break;
-  case AttributeList::AT_CUDAHost:    handleHostAttr        (S, D, Attr); break;
   case AttributeList::AT_Overloadable:handleOverloadableAttr(S, D, Attr); break;
   default:
     break;
@@ -4713,8 +4731,6 @@ static void ProcessInheritableDeclAttr(Sema &S, Scope *scope, Decl *D,
     // Ignore these, these are type attributes, handled by
     // ProcessTypeAttributes.
     break;
-  case AttributeList::AT_CUDADevice:
-  case AttributeList::AT_CUDAHost:
   case AttributeList::AT_Overloadable:
     // Ignore, this is a non-inheritable attribute, handled
     // by ProcessNonInheritableDeclAttr.
@@ -4982,6 +4998,11 @@ static void ProcessInheritableDeclAttr(Sema &S, Scope *scope, Decl *D,
   case AttributeList::AT_TypeTagForDatatype:
     handleTypeTagForDatatypeAttr(S, D, Attr);
     break;
+
+  // Host and device CUDA attributes.
+  case AttributeList::AT_CUDADevice:  handleDeviceAttr      (S, D, Attr); break;
+  case AttributeList::AT_CUDAHost:    handleHostAttr        (S, D, Attr); break;
+
 
   default:
     // Ask target about the attribute.

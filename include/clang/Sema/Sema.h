@@ -7206,6 +7206,8 @@ public:
                            IdentifyCUDATarget(Callee));
   }
 
+  bool InheritCUDATarget(FunctionDecl *Caller, FunctionDecl *Callee);
+
   /// \name Code completion
   //@{
   /// \brief Describes the context in which code completion occurs.

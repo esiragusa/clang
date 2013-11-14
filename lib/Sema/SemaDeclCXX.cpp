@@ -12239,6 +12239,69 @@ bool Sema::CheckCUDATarget(CUDAFunctionTarget CallerTarget,
   return false;
 }
 
+// FIXME split into two functions, a weak one for finding viable overloadings and a strict one for post-overloading
+//bool CheckCUDATarget(const FunctionDecl *Caller, const FunctionDecl *Callee) {
+//}
+
+bool Sema::InheritCUDATarget(FunctionDecl *Caller, FunctionDecl *Callee) {
+    if (Callee->isImplicit())
+        return false;
+
+    // Restrict target inheritance to template functions.
+    if (Callee->getTemplatedKind() == FunctionDecl::TK_NonTemplate && !Callee->isInlined())
+    {
+        llvm::outs() << "INHERIT ";
+        Caller->print(llvm::outs());
+        llvm::outs() << " --> ";
+        Callee->print(llvm::outs());
+        if (Callee->getTemplatedKind() == FunctionDecl::TK_NonTemplate)
+            llvm::outs() << " NO: NON-TEMPLATE CALLEE\n";
+        else
+            llvm::outs() << " NO: NON-INLINED CALLEE\n";
+
+        return false;
+    }
+
+    llvm::outs() << "INHERIT ";
+    Caller->print(llvm::outs());
+    llvm::outs() << " --> ";
+    Callee->print(llvm::outs());
+
+    // No inheritance if callee is explicitly qualified.
+    CUDADeviceAttr *CalleeDeviceAttr = Callee->getAttr<CUDADeviceAttr>();
+    CUDAHostAttr *CalleeHostAttr = Callee->getAttr<CUDAHostAttr>();
+    if ((CalleeDeviceAttr && !CalleeDeviceAttr->isInherited()) ||
+        (CalleeHostAttr && !CalleeHostAttr->isInherited()))
+    {
+        llvm::outs() << " NO: CALLEE HAS NON-INHERITED QUALIFIERS\n";
+        return false;
+    }
+
+    // Inherit device qualifier.
+    if (Caller->hasAttr<CUDADeviceAttr>() || Callee->hasAttr<CUDAGlobalAttr>()) {
+        if (!CalleeDeviceAttr) {
+            CalleeDeviceAttr = ::new (Context) CUDADeviceAttr(SourceRange(), this->getASTContext(), 0u);
+            CalleeDeviceAttr->setInherited(true);
+            Callee->addAttr(CalleeDeviceAttr);
+        }
+    }
+
+    // Inherit host qualifier.
+    if (Caller->hasAttr<CUDAHostAttr>() || Caller->isMain()) {
+        if (!CalleeHostAttr) {
+            CUDAHostAttr *CalleeHostAttr = ::new (Context) CUDAHostAttr(SourceRange(), this->getASTContext(), 0u);
+            CalleeHostAttr->setInherited(true);
+            Callee->addAttr(CalleeHostAttr);
+        }
+    }
+
+    llvm::outs() << " ==> ";
+    Callee->print(llvm::outs());
+    llvm::outs() << "\n";
+
+    return true;
+}
+
 /// HandleMSProperty - Analyze a __delcspec(property) field of a C++ class.
 ///
 MSPropertyDecl *Sema::HandleMSProperty(Scope *S, RecordDecl *Record,

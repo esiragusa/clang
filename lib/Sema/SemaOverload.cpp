@@ -5399,12 +5399,20 @@ Sema::AddOverloadCandidate(FunctionDecl *Function,
 
   // (CUDA B.1): Check for invalid calls between targets.
   if (getLangOpts().CUDA)
-    if (const FunctionDecl *Caller = dyn_cast<FunctionDecl>(CurContext))
+    if (FunctionDecl *Caller = dyn_cast<FunctionDecl>(CurContext)) {
+      InheritCUDATarget(Caller, Function);
+      llvm::outs() << "CHECK   ";
+      Caller->print(llvm::outs());
+      llvm::outs() << " --> ";
+      Function->print(llvm::outs());
       if (CheckCUDATarget(Caller, Function)) {
+        llvm::outs() << " FAILED\n";
         Candidate.Viable = false;
         Candidate.FailureKind = ovl_fail_bad_target;
         return;
       }
+      llvm::outs() << " OK\n";
+    }
 
   // Determine the implicit conversion sequences for each of the
   // arguments.
@@ -9558,6 +9566,11 @@ static void AddOverloadedCallCandidate(Sema &S,
 
   if (FunctionTemplateDecl *FuncTemplate
       = dyn_cast<FunctionTemplateDecl>(Callee)) {
+
+//  if (getLangOpts().CUDA)
+//    if (FunctionDecl *Caller = dyn_cast<FunctionDecl>(CurContext)) {
+//  InheritCUDATarget(Caller, Function);
+
     S.AddTemplateOverloadCandidate(FuncTemplate, FoundDecl,
                                    ExplicitTemplateArgs, Args, CandidateSet);
     return;
